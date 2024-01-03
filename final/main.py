@@ -3,8 +3,9 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+from sklearn.dummy import DummyRegressor
+from sklearn.metrics import r2_score
 from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import PolynomialFeatures
 from readfiles import readFiles
 
@@ -50,6 +51,7 @@ weekDays = pd.Series(weekDays, index = None)
 
 # Split into only precovid data
 precovidBA = dates < "2020-03-15"
+pcDates = dates[precovidBA]
 pcUsages = avgUsages[precovidBA]
 pcMonths = months[precovidBA]
 pcWeekDays = weekDays[precovidBA]
@@ -59,9 +61,7 @@ pcWeekDays = weekDays[precovidBA]
 X = np.column_stack((pcWeekDays,pcMonths))
 
 ## Train and test various models to find best fit parameters
-# Train
-fig, ax = plt.subplots(figsize=(12, 7))
-
+#Create test X's
 range = pd.date_range(start="2018-08-01",end="2020-03-15")
 monthsTest = []
 weekDaysTest = []
@@ -70,10 +70,13 @@ for date in range:
     weekDaysTest.append(date.day_of_week)
 Xtest = np.column_stack((weekDaysTest,monthsTest))
 
+#Remove dates that arent in training for scoring
+dateisInTestingBA = range.isin(pcDates)
 
 degreePoly = [1, 2, 5, 7]
 for degree in degreePoly:
-    plt.plot(dates[precovidBA][::3], pcUsages[::3])
+    #Train and Test
+    plt.plot(pcDates[::3], pcUsages[::3])
     polyX = PolynomialFeatures(degree).fit_transform(np.array(X))
 
     model = LinearRegression()
@@ -82,20 +85,31 @@ for degree in degreePoly:
     polyXTest = PolynomialFeatures(degree).fit_transform(np.array(Xtest))
     ypred = model.predict(polyXTest)
 
+    #Dummy model comparison
+    dr = DummyRegressor(strategy="mean")
+    dr.fit(polyX, pcUsages)
+    ydummy = dr.predict(polyXTest)
+
+    #Plot
     plt.plot(range[::3],ypred[::3], alpha=0.6) #Plot every 3rd day to be able to read graph
+    plt.plot(range[::3],ydummy[::3], alpha=0.6) #Plot every 3rd day to be able to read graph
 
     plt.xticks(rotation=30)
     plt.xlabel("Date")
     plt.ylabel("Pre-Covid Linear Regression Model Predictions")
     stringdegree = "Degree= " + int.__str__(degree)
-    plt.legend(["Real Data", stringdegree], loc='upper right',fancybox=True, shadow=True)
+    plt.legend(["Real Data", stringdegree, "Mean Dummy Model"], loc='upper right',fancybox=True, shadow=True)
     plt.title("Compiled Bike Data")
     stringname = "featuremodel" + int.__str__(degree)
     plt.savefig('./Report/' + stringname)
     plt.show()
 
+    #Score
+    print("Linear model (Degree = ", degree, "):")
+    print(r2_score(pcUsages, ypred[dateisInTestingBA]))
 
-
+    print("Mean Dummy model (Degree = ", degree, "):")
+    print(r2_score(pcUsages, ydummy[dateisInTestingBA]))
 
 
 
