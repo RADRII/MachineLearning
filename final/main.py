@@ -1,3 +1,4 @@
+import datetime
 import os.path
 import pandas as pd
 import numpy as np
@@ -7,6 +8,7 @@ from sklearn.dummy import DummyRegressor
 from sklearn.metrics import r2_score
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
+from statsmodels.tsa.arima.model import ARIMA
 from readfiles import readFiles
 
 plt.rcParams['figure.figsize'] = [12, 7]
@@ -58,7 +60,7 @@ pcWeekDays = weekDays[precovidBA]
 
 # X's: month, weekday
 # Y: Usage
-X = np.column_stack((pcWeekDays,pcMonths))
+pcX = np.column_stack((pcWeekDays,pcMonths))
 
 ## Train and test various models to find best fit parameters
 #Create test X's
@@ -77,7 +79,7 @@ degreePoly = [1, 2, 5, 7]
 for degree in degreePoly:
     #Train and Test
     plt.plot(pcDates[::3], pcUsages[::3])
-    polyX = PolynomialFeatures(degree).fit_transform(np.array(X))
+    polyX = PolynomialFeatures(degree).fit_transform(np.array(pcX))
 
     model = LinearRegression()
     model.fit(polyX, pcUsages)
@@ -96,10 +98,10 @@ for degree in degreePoly:
 
     plt.xticks(rotation=30)
     plt.xlabel("Date")
-    plt.ylabel("Pre-Covid Linear Regression Model Predictions")
+    plt.ylabel("Average Bikes Taken from All Stations")
     stringdegree = "Degree= " + int.__str__(degree)
     plt.legend(["Real Data", stringdegree, "Mean Dummy Model"], loc='upper right',fancybox=True, shadow=True)
-    plt.title("Compiled Bike Data")
+    plt.title("Pre-Covid Linear Regression Model Predictions")
     stringname = "featuremodel" + int.__str__(degree)
     plt.savefig('./Report/' + stringname)
     plt.show()
@@ -111,5 +113,40 @@ for degree in degreePoly:
     print("Mean Dummy model (Degree = ", degree, "):")
     print(r2_score(pcUsages, ydummy[dateisInTestingBA]))
 
+#Best model was the one with degree five
+#Use model trained on pre-covid data to predict
+    
+#Train
 
+polyX = PolynomialFeatures(5).fit_transform(np.array(pcX))
+model = LinearRegression()
+model.fit(polyX, pcUsages)
+
+#Create predict X's
+range = pd.date_range(start="2018-08-01",end="2023-12-31")
+monthsTest = []
+weekDaysTest = []
+for date in range:
+    monthsTest.append(date.month)
+    weekDaysTest.append(date.day_of_week)
+Xpredict = np.column_stack((weekDaysTest,monthsTest))
+polyXp = PolynomialFeatures(5).fit_transform(np.array(Xpredict))
+
+ypred = model.predict(polyXp)
+
+#Plot
+plt.plot(dates[::3],avgUsages[::3], alpha=0.6) #Plot every 3rd day to be able to read graph
+plt.plot(range[::3],ypred[::3], alpha=0.6) #Plot every 3rd day to be able to read graph
+plt.axvline(x = datetime.date(2020, 3, 15))
+plt.axvline(x = datetime.date(2022, 1, 22))
+
+plt.xticks(rotation=30)
+plt.xlabel("Date")
+plt.ylabel("Average Bikes Taken from All Stations")
+stringdegree = "Degree= " + int.__str__(5)
+plt.legend(["Real Data", stringdegree, "Covid Start", "Covid Restrictions End"], loc='upper right',fancybox=True, shadow=True)
+plt.title("Actual Covid Usages vs Model Predicted Usages ")
+stringname = "covidDif" + int.__str__(5)
+plt.savefig('./Report/' + stringname)
+plt.show()
 
