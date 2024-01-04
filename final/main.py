@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+from sklearn import preprocessing
 from sklearn.dummy import DummyRegressor
 from sklearn.metrics import r2_score
 from sklearn.linear_model import LinearRegression
@@ -26,6 +27,11 @@ dates=df.iloc[:,0]
 dates = pd.to_datetime(dates)
 avgUsages=df.iloc[:,1]
 
+# Remove duplicates, theres just a few as some dates are in two files. They all have the same avgusage for both so its fine to just delete one.
+duplicateBA = dates.duplicated(keep="first")
+dates = dates[~duplicateBA].reset_index(drop=True)
+avgUsages = avgUsages[~duplicateBA].reset_index(drop=True)
+
 ## Create and show graphs of the data
 fig, ax = plt.subplots(figsize=(12, 7))
 
@@ -44,7 +50,6 @@ plt.savefig('./Report/CompiledData.png')
 plt.show()
 
 ## Reorganize data for training
-# Remove year from date and only mark month and weekday
 months = []
 weekDays = []
 years = []
@@ -188,10 +193,10 @@ model = LinearRegression()
 model.fit(polyX, pcUsages)
 
 #Create predict X's
-range = pd.date_range(start="2018-08-01",end="2023-12-31")
+rangedate = pd.date_range(start="2018-08-01",end="2024-01-01")
 monthsTest = []
 weekDaysTest = []
-for date in range:
+for date in rangedate:
     monthsTest.append(date.month)
     weekDaysTest.append(date.day_of_week)
 Xpredict = np.column_stack((weekDaysTest,monthsTest))
@@ -201,7 +206,7 @@ ypred = model.predict(polyXp)
 
 #Plot
 plt.plot(dates[::3],avgUsages[::3], alpha=0.6) #Plot every 3rd day to be able to read graph
-plt.plot(range[::3],ypred[::3], alpha=0.6) #Plot every 3rd day to be able to read graph
+plt.plot(rangedate[::3],ypred[::3], alpha=0.6) #Plot every 3rd day to be able to read graph
 plt.axvline(x = datetime.date(2020, 3, 15), color = 'black')
 plt.axvline(x = datetime.date(2022, 1, 22), color = 'black')
 
@@ -209,9 +214,15 @@ plt.xticks(rotation=30)
 plt.xlabel("Date")
 plt.ylabel("Average Bikes Taken from All Stations")
 stringdegree = "Degree= " + int.__str__(5)
-plt.legend(["Real Data", stringdegree, "Covid Start", "Covid Restrictions End"], loc='upper right',fancybox=True, shadow=True)
+plt.legend(["Real Data", stringdegree, "Covid Start", "Covid Restrictions End"], loc='lower left',fancybox=True, shadow=True)
 plt.title("Actual Covid Usages vs Model Predicted Usages ")
 stringname = "covidDif" + int.__str__(5)
 plt.savefig('./Report/' + stringname)
 plt.show()
 
+#Score
+#Remove dates that arent in training for scoring
+dateisInTestingBA1 = rangedate.isin(dates)
+
+print("Linear model r2 score")
+print(r2_score(avgUsages, ypred[dateisInTestingBA1]))
